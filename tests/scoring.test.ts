@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { initialCriteria, type Criteria } from '../lib/criteria';
 import { MARKETS, PRODUCT_TYPES, type Market, type ProductType } from '../lib/domain';
+import { selectCandidates } from '../lib/agents/research';
 import { MIN_CANDIDATES, rankIngredients, type Ingredient } from '../lib/scoring';
 import { ingredients as seed } from '../supabase/seed/ingredients.mjs';
 
@@ -57,5 +58,38 @@ describe('순위', () => {
     const s = rankIngredients(ingredients, criteria, brief)[0].ingredient_id;
     const w = rankIngredients(ingredients, initialCriteria(winter), winter)[0].ingredient_id;
     expect(s).not.toBe(w);
+  });
+});
+
+describe('원료 지정과 제외', () => {
+  const project = { name: '테스트', ...brief };
+  const ranked = rankIngredients(ingredients, criteria, brief);
+  const ref = (id: string) => ({ id, name: ingredients.find((i) => i.id === id)!.name });
+
+  it('뺀 원료는 후보에 없고, 그 자리는 다음 순위 원료가 채운다', () => {
+    const first = ranked[0].ingredient_id;
+    const r = selectCandidates(ingredients, { ...criteria, exclude: [ref(first)] }, project);
+    expect(r.candidates.map((c) => c.ingredient_id)).not.toContain(first);
+    expect(r.candidates).toHaveLength(5);
+    expect(r.candidates[0].ingredient_id).toBe(ranked[1].ingredient_id);
+  });
+  it('꼭 넣을 원료는 점수가 낮거나 필수 조건을 통과하지 못해도 후보에 들어간다', () => {
+    const failing = ingredients.find((i) => !ranked.some((c) => c.ingredient_id === i.id))!;
+    const low = ranked.at(-1)!.ingredient_id;
+    const r = selectCandidates(ingredients, { ...criteria, include: [ref(failing.id), ref(low)] }, project);
+    const ids = r.candidates.map((c) => c.ingredient_id);
+    expect(ids).toContain(failing.id);
+    expect(ids).toContain(low);
+    expect(r.candidates).toHaveLength(5);
+    expect(r.pinned).toBe(2);
+    expect(r.candidates.filter((c) => c.pinned).map((c) => c.ingredient_id).sort()).toEqual([failing.id, low].sort());
+    // 나머지 세 자리는 지정하지 않은 원료 중 점수가 높은 순서다.
+    const rest = ranked.filter((c) => c.ingredient_id !== low).slice(0, 3).map((c) => c.ingredient_id);
+    expect(ids.filter((id) => id !== failing.id && id !== low)).toEqual(rest);
+  });
+  it('점수는 서버가 계산한 값 그대로다', () => {
+    const low = ranked.at(-1)!;
+    const r = selectCandidates(ingredients, { ...criteria, include: [ref(low.ingredient_id)] }, project);
+    expect(r.candidates.find((c) => c.ingredient_id === low.ingredient_id)!.total).toBe(low.total);
   });
 });

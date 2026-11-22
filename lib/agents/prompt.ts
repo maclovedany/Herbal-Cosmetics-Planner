@@ -25,7 +25,7 @@ export function describeCandidates(candidates: Candidate[]): string {
     .map(
       (c) => `- ingredient_id: ${c.ingredient_id}
   원료: ${c.name} (${c.name_en}), 생약명 ${c.herbal_name}
-  순위 ${c.rank}위, 총점 ${c.total}
+  순위 ${c.rank}위, 총점 ${c.total}${c.pinned ? ' · 기획자가 꼭 넣도록 지정한 원료' : ''}
   지표 성분: ${c.actives.join(', ')}
   효능 분류: ${c.concerns.map((x) => CONCERNS[x]).join(', ')}
   출처:

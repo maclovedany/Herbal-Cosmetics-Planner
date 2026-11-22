@@ -25,8 +25,10 @@ export async function runPlanPipeline(input: {
   generate?: GenerateJson;
   images?: ImageDeps;
   emit?: Emit;
+  // 피드백에서 온 기획안 수정 요청. 있으면 이전 버전 기획안을 고쳐 쓴다.
+  edit?: { previous: Plan; instruction: string };
 }): Promise<{ plan: Plan; candidates: Candidate[] }> {
-  const { project, criteria, ingredients } = input;
+  const { project, criteria, ingredients, edit } = input;
   const generate = input.generate ?? generateJson;
   const emit = input.emit ?? (() => {});
 
@@ -35,7 +37,7 @@ export async function runPlanPipeline(input: {
     const r = selectCandidates(ingredients, criteria, project);
     return {
       value: r.candidates,
-      note: `원료 ${ingredients.length}건 중 필수 조건을 통과한 ${r.passed}건을 점수순으로 세워 상위 ${r.candidates.length}건을 골랐어요. 1위는 ${r.candidates[0].name}(${r.candidates[0].total}점)이에요.`,
+      note: `원료 ${ingredients.length}건 중 ${criteria.exclude?.length ? `기준에서 뺀 ${criteria.exclude.length}건을 제외하고 ` : ''}조건에 맞는 ${r.passed}건을 점수순으로 세워 ${r.candidates.length}건을 골랐어요.${r.pinned ? ` 그중 ${r.pinned}건은 꼭 넣도록 지정한 원료예요.` : ''} 1위는 ${r.candidates[0].name}(${r.candidates[0].total}점)이에요.`,
       db: [{ store: 'ingredients' as const, op: 'read' as const, note: `원료 ${ingredients.length}건의 특성과 출처를 읽었어요.` }],
     };
   });
@@ -46,8 +48,8 @@ export async function runPlanPipeline(input: {
 
   // 기획자 → 검토자. 검토자가 돌려보내면 한 번 고쳐 쓴다.
   let draft = await runStep(emit, 'plan_write', async () => ({
-    value: await generate(buildPlanPrompt(project, criteria, candidates, research), PLAN_SCHEMA),
-    note: '콘셉트와 원료별 추천 이유를 써서 검토자에게 넘겼어요.',
+    value: await generate(buildPlanPrompt(project, criteria, candidates, research, undefined, edit), PLAN_SCHEMA),
+    note: edit ? '수정 요청을 반영해 이전 버전 기획안을 고쳐 써서 검토자에게 넘겼어요.' : '콘셉트와 원료별 추천 이유를 써서 검토자에게 넘겼어요.',
   }));
   let plan: Plan;
   let review = { approved: false, issues: [] as string[] };
@@ -71,12 +73,12 @@ export async function runPlanPipeline(input: {
       };
     });
     if (review.approved || round > MAX_REVISIONS) {
-      plan = { ...plan, research, review: { ...review, rounds: round } };
+      plan = { ...plan, research, review: { ...review, rounds: round }, ...(edit ? { edit_request: edit.instruction } : {}) };
       break;
     }
     const previous = plan;
     draft = await runStep(emit, 'plan_revise', async () => ({
-      value: await generate(buildPlanPrompt(project, criteria, candidates, research, { previous, issues: review.issues }), PLAN_SCHEMA),
+      value: await generate(buildPlanPrompt(project, criteria, candidates, research, { previous, issues: review.issues }, edit), PLAN_SCHEMA),
       note: `검토 의견 ${review.issues.length}건을 반영해 다시 썼어요.`,
     }));
   }

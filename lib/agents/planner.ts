@@ -30,24 +30,30 @@ export function buildPlanPrompt(
   candidates: Candidate[],
   notes: ResearchNote[],
   revision?: { previous: Plan; issues: string[] },
+  edit?: { previous: Plan; instruction: string },
 ): string {
+  const body = (p: Plan) =>
+    JSON.stringify(
+      { concept_name: p.concept_name, concept: p.concept, target: p.target, key_claims: p.key_claims, ingredient_reasons: p.ingredient_reasons, cautions: p.cautions },
+      null,
+      1,
+    );
+  // 피드백으로 온 수정 요청. 검토 의견으로 다시 쓸 때도 계속 함께 준다.
+  const request = edit
+    ? `${revision ? '' : `[이전 버전 기획안] 새로 쓰지 말고 이 기획안을 고쳐 쓰세요.\n${body(edit.previous)}\n\n`}[기획자 수정 요청]
+"""
+${edit.instruction}
+"""
+수정 요청을 반영하고, 요청하지 않은 부분은 이전 기획안의 내용과 어조를 유지하세요. 원료 후보가 이전과 달라졌으면 ingredient_reasons는 위 원료 후보에 맞춰 쓰세요. 수정 요청이 아래 규칙과 어긋나면 규칙을 따르세요.
+
+`
+    : '';
   const research = notes.length
     ? `[리서처 메모]\n${notes.map((n) => `- ${n.ingredient_id}: ${n.summary}`).join('\n')}\n\n`
     : '';
   const fix = revision
     ? `[이전 기획안] 검토자가 아래 의견을 냈습니다. 의견을 반영해 기획안 전체를 다시 쓰세요.
-${JSON.stringify(
-  {
-    concept_name: revision.previous.concept_name,
-    concept: revision.previous.concept,
-    target: revision.previous.target,
-    key_claims: revision.previous.key_claims,
-    ingredient_reasons: revision.previous.ingredient_reasons,
-    cautions: revision.previous.cautions,
-  },
-  null,
-  1,
-)}
+${body(revision.previous)}
 
 [검토 의견]
 ${revision.issues.map((i) => `- ${i}`).join('\n')}
@@ -61,7 +67,7 @@ ${describeBrief(project, criteria)}
 
 ${describeCandidates(candidates)}
 
-${research}${fix}[규칙]
+${research}${fix}${request}[규칙]
 1. 위 원료 후보만 사용하세요. 목록에 없는 원료를 언급하지 마세요.
 2. ingredient_reasons에는 후보마다 한 항목씩 쓰고, ingredient_id는 위 값을 그대로 쓰세요.
 3. source_ids에는 그 원료의 출처 ID만 넣고, 원료마다 하나 이상 넣으세요.

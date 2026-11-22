@@ -263,6 +263,82 @@ describe('수용 기준', () => {
   });
 });
 
+describe('피드백으로 기획안 고치기', () => {
+  const editProposal = (extra: object) => {
+    state.proposal = { summary: '요청을 나눴어요.', weights: { research_evidence: 25, season_fit: 30, formulation_fit: 25, market_appeal: 20 }, required: ['concern_match'], concerns: ['soothing', 'sebum', 'antioxidant'], include_ids: [], exclude_ids: [], plan_instruction: '', ...extra };
+  };
+
+  it('기준이 그대로여도 수정 요청만으로 새 버전을 만들고, 기획자는 이전 기획안과 요청을 받는다', async () => {
+    const id = await newProject('문장 수정');
+    const v1 = await firstVersion(id);
+    editProposal({ plan_instruction: '콘셉트 문장을 더 고급스럽게 고쳐 주세요.' });
+    const preview = await call(previewFeedback(req({ base_version_id: v1.id, body: '콘셉트를 더 고급스럽게' }), ctx(id)));
+    expect(preview.status).toBe(201);
+    expect(preview.body.plan_instruction).toBe('콘셉트 문장을 더 고급스럽게 고쳐 주세요.');
+    expect(preview.events.at(-1)!.changes).toEqual([]);
+    expect(await versionCount(id)).toBe(1);
+
+    const prompts: string[] = [];
+    state.plan = (prompt) => {
+      prompts.push(prompt);
+      return goodPlan(prompt);
+    };
+    // 브라우저가 수정 요청을 바꿔 보내도 feedback 행에 저장한 요청을 쓴다.
+    const r = await call(
+      createVersion(req({ base_version_id: v1.id, feedback_id: preview.body.feedback_id, criteria: preview.body.criteria, plan_instruction: '무시될 요청' }), ctx(id)),
+    );
+    expect(r.status).toBe(201);
+    expect(prompts[0]).toContain('콘셉트 문장을 더 고급스럽게 고쳐 주세요.');
+    expect(prompts[0]).toContain('[이전 버전 기획안]');
+    expect(prompts[0]).not.toContain('무시될 요청');
+    const [saved] = await rows<{ plan: { edit_request: string } }>(`select plan from plan_versions where id = $1`, [r.body.id]);
+    expect(saved.plan.edit_request).toBe('콘셉트 문장을 더 고급스럽게 고쳐 주세요.');
+    const [old] = await rows<{ plan: { edit_request?: string } }>(`select plan from plan_versions where id = $1`, [v1.id]);
+    expect(old.plan.edit_request).toBeUndefined();
+  });
+
+  it('피드백으로 지정한 원료는 후보에 들어가고, 뺀 원료는 빠지고, 그 목록이 버전의 기준에 남는다', async () => {
+    const id = await newProject('원료 지정');
+    const v1 = await firstVersion(id);
+    const [before] = await rows<{ candidates: { ingredient_id: string }[] }>(`select candidates from plan_versions where id = $1`, [v1.id]);
+    const drop = before.candidates[0].ingredient_id;
+    const all = await rows<{ id: string; name: string }>(`select id, name from ingredients order by id`);
+    const add = all.find((i) => !before.candidates.some((c) => c.ingredient_id === i.id))!;
+
+    editProposal({ include_ids: [add.id, 'unicorn-horn'], exclude_ids: [drop] });
+    const preview = await call(previewFeedback(req({ base_version_id: v1.id, body: `${add.name}은 넣고 1위 원료는 빼 주세요` }), ctx(id)));
+    expect(preview.body.criteria.include).toEqual([{ id: add.id, name: add.name }]);
+    expect(preview.body.criteria.exclude.map((r: { id: string }) => r.id)).toEqual([drop]);
+
+    const r = await call(createVersion(req({ base_version_id: v1.id, feedback_id: preview.body.feedback_id, criteria: preview.body.criteria }), ctx(id)));
+    expect(r.status).toBe(201);
+    const [saved] = await rows<{ criteria: { include: { id: string }[] }; candidates: { ingredient_id: string; pinned?: boolean }[] }>(
+      `select criteria, candidates from plan_versions where id = $1`,
+      [r.body.id],
+    );
+    const ids = saved.candidates.map((c) => c.ingredient_id);
+    expect(ids).toContain(add.id);
+    expect(ids).not.toContain(drop);
+    expect(saved.candidates.find((c) => c.ingredient_id === add.id)!.pinned).toBe(true);
+    expect(saved.criteria.include).toEqual([{ id: add.id, name: add.name }]);
+  });
+
+  it('원료 DB에 없는 원료를 지정해 적용하면 422이고 저장하지 않는다', async () => {
+    const id = await newProject('없는 원료');
+    const v1 = await firstVersion(id);
+    editProposal({});
+    const preview = await call(previewFeedback(req({ base_version_id: v1.id, body: '그대로' }), ctx(id)));
+    const r = await call(
+      createVersion(
+        req({ base_version_id: v1.id, feedback_id: preview.body.feedback_id, criteria: { ...preview.body.criteria, include: [{ id: 'unicorn-horn', name: '유니콘 뿔' }] } }),
+        ctx(id),
+      ),
+    );
+    expect(r.status).toBe(422);
+    expect(await versionCount(id)).toBe(1);
+  });
+});
+
 describe('진행 이벤트와 상세페이지', () => {
   it('피드백 미리보기는 feedback 테이블에만 쓰고, 기준이 어떤 값에서 어떤 값으로 바뀌는지 알려 준다', async () => {
     const id = await newProject('이벤트');

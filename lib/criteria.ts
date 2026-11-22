@@ -18,10 +18,17 @@ export const REQUIRED = {
 export type RequiredKey = keyof typeof REQUIRED;
 export const REQUIRED_KEYS = Object.keys(REQUIRED) as RequiredKey[];
 
+// 원료 DB의 원료 하나를 가리킨다. 이름은 화면 표시용이고, 서버가 저장 전에 DB의 이름으로 다시 쓴다.
+export type IngredientRef = { id: string; name: string };
+export const MAX_INCLUDE = 5;
+
 export type Criteria = {
   season: { climate: Climate; concerns: Concern[] };
   required: RequiredKey[];
   weights: Record<WeightKey, number>;
+  // 꼭 넣을 원료와 뺄 원료. 비어 있으면 키를 두지 않는다. 이 기능을 넣기 전에 만든 버전에는 없다.
+  include?: IngredientRef[];
+  exclude?: IngredientRef[];
 };
 
 const DEFAULT_WEIGHTS: Record<WeightKey, number> = {
@@ -48,6 +55,23 @@ function uniqueKnown<T extends string>(v: unknown, known: readonly string[]): T[
   if (!v.every((x) => typeof x === 'string' && known.includes(x))) return null;
   if (new Set(v).size !== v.length) return null;
   return v as T[];
+}
+
+function parseRefs(v: unknown): IngredientRef[] | null {
+  if (v === undefined) return [];
+  if (!Array.isArray(v)) return null;
+  const refs: IngredientRef[] = [];
+  for (const x of v) {
+    if (!isObject(x) || typeof x.id !== 'string' || typeof x.name !== 'string') return null;
+    refs.push({ id: x.id, name: x.name });
+  }
+  return new Set(refs.map((r) => r.id)).size === refs.length ? refs : null;
+}
+
+// 지정·제외 목록이 비어 있으면 키를 빼서, 목록이 없던 예전 기준과 같은 모양으로 둔다.
+function withRefs(base: Criteria, include: IngredientRef[], exclude: IngredientRef[]): Criteria {
+  const { include: _i, exclude: _e, ...rest } = base;
+  return { ...rest, ...(include.length ? { include } : {}), ...(exclude.length ? { exclude } : {}) };
 }
 
 export type Validation = { ok: true; criteria: Criteria } | { ok: false; error: string };
@@ -82,7 +106,25 @@ export function validateCriteria(input: unknown): Validation {
   const sum = WEIGHT_KEYS.reduce((s, k) => s + weights[k], 0);
   if (sum !== 100) return { ok: false, error: `가중치 합이 100이어야 해요. 지금은 ${sum}이에요.` };
 
-  return { ok: true, criteria: { season: { climate: climate as Climate, concerns }, required, weights } };
+  const include = parseRefs(input.include);
+  const exclude = parseRefs(input.exclude);
+  if (!include || !exclude) return { ok: false, error: '지정하거나 제외할 원료의 형식이 맞지 않아요.' };
+  if (include.length > MAX_INCLUDE) return { ok: false, error: `꼭 넣을 원료는 ${MAX_INCLUDE}개까지 지정할 수 있어요.` };
+  if (include.some((r) => exclude.some((x) => x.id === r.id))) {
+    return { ok: false, error: '같은 원료를 꼭 넣을 원료와 뺄 원료에 함께 둘 수 없어요.' };
+  }
+
+  return { ok: true, criteria: withRefs({ season: { climate: climate as Climate, concerns }, required, weights }, include, exclude) };
+}
+
+// 지정·제외 원료가 모두 원료 DB에 있는지 확인하고 이름을 DB의 값으로 바꾼다. 없는 원료가 있으면 null.
+export function resolveRefs(criteria: Criteria, catalog: IngredientRef[]): Criteria | null {
+  const byId = new Map(catalog.map((c) => [c.id, c.name]));
+  const resolve = (refs: IngredientRef[] = []) => refs.map((r) => ({ id: r.id, name: byId.get(r.id) }));
+  const include = resolve(criteria.include);
+  const exclude = resolve(criteria.exclude);
+  if ([...include, ...exclude].some((r) => r.name === undefined)) return null;
+  return withRefs(criteria, include as IngredientRef[], exclude as IngredientRef[]);
 }
 
 // 합이 100인 정수로 맞춘다. 비율을 유지하고 남는 값은 소수점이 큰 항목부터 준다.
@@ -103,7 +145,8 @@ export function normalizeWeights(raw: Record<WeightKey, number>): Record<WeightK
 }
 
 // AI가 제안한 변경안을 허용된 값만 남겨 유효한 기준으로 만든다. 기후는 브리프에서 정해지므로 바꾸지 않는다.
-export function sanitizeProposal(raw: unknown, current: Criteria): Criteria {
+// catalog(원료 DB의 ID와 이름)를 주면 include_ids·exclude_ids에서 DB에 있는 원료만 남긴다.
+export function sanitizeProposal(raw: unknown, current: Criteria, catalog?: IngredientRef[]): Criteria {
   const r = isObject(raw) ? raw : {};
   const rw = isObject(r.weights) ? r.weights : {};
   const merged = {} as Record<WeightKey, number>;
@@ -117,14 +160,25 @@ export function sanitizeProposal(raw: unknown, current: Criteria): Criteria {
   const concerns = Array.isArray(r.concerns)
     ? concernKeys.filter((k) => (r.concerns as unknown[]).includes(k))
     : [];
-  return {
-    season: {
-      climate: current.season.climate,
-      concerns: concerns.length > 0 ? concerns : current.season.concerns,
+  const pick = (ids: unknown, fallback: IngredientRef[] = []) =>
+    catalog && Array.isArray(ids) ? catalog.filter((c) => ids.includes(c.id)).map((c) => ({ id: c.id, name: c.name })) : fallback;
+  const exclude = pick(r.exclude_ids, current.exclude);
+  // 같은 원료가 양쪽에 있으면 빼는 쪽을 따른다.
+  const include = pick(r.include_ids, current.include)
+    .filter((x) => !exclude.some((e) => e.id === x.id))
+    .slice(0, MAX_INCLUDE);
+  return withRefs(
+    {
+      season: {
+        climate: current.season.climate,
+        concerns: concerns.length > 0 ? concerns : current.season.concerns,
+      },
+      required,
+      weights: normalizeWeights(merged),
     },
-    required,
-    weights: normalizeWeights(merged),
-  };
+    include,
+    exclude,
+  );
 }
 
 export type CriteriaChange = { label: string; from: string; to: string };
@@ -147,5 +201,8 @@ export function diffCriteria(a: Criteria, b: Criteria): CriteriaChange[] {
   if (names(a.season.concerns) !== names(b.season.concerns)) {
     changes.push({ label: '피부 고민', from: names(a.season.concerns), to: names(b.season.concerns) });
   }
+  const refs = (list: IngredientRef[] = []) => list.map((r) => r.name).sort().join(', ') || '없음';
+  if (refs(a.include) !== refs(b.include)) changes.push({ label: '꼭 넣을 원료', from: refs(a.include), to: refs(b.include) });
+  if (refs(a.exclude) !== refs(b.exclude)) changes.push({ label: '뺄 원료', from: refs(a.exclude), to: refs(b.exclude) });
   return changes;
 }

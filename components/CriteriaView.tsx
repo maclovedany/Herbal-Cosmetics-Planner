@@ -43,6 +43,23 @@ export function CriteriaView({ criteria, previous }: { criteria: Criteria; previ
           </ul>
         )}
       </div>
+      {!!(criteria.include?.length || criteria.exclude?.length) && (
+        <div>
+          <p className="eyebrow">원료 지정</p>
+          <div className="row">
+            {criteria.include?.map((r) => (
+              <span key={r.id} className="chip">
+                꼭 넣기 · {r.name}
+              </span>
+            ))}
+            {criteria.exclude?.map((r) => (
+              <span key={r.id} className="chip warn">
+                빼기 · {r.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

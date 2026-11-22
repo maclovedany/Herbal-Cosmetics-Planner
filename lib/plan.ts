@@ -21,4 +21,6 @@ export type Plan = {
   research?: ResearchNote[];
   review?: Review;
   detail_page?: DetailPage;
+  // 피드백에서 온 기획안 수정 요청. 이 요청을 반영해 고쳐 쓴 버전에만 있다.
+  edit_request?: string;
 };

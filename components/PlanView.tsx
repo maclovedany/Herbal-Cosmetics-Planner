@@ -56,7 +56,7 @@ export function PlanCandidates(props: { candidates: Candidate[]; other?: Candida
             <tr key={c.ingredient_id}>
               <td>{c.rank}</td>
               <td>
-                {c.name} {mark(c)}
+                {c.name} {c.pinned && <span className="chip gold">지정</span>} {mark(c)}
                 <div className="muted small">{c.name_en}</div>
               </td>
               {WEIGHT_KEYS.map((k) => (
@@ -181,6 +181,11 @@ export function PlanDetail({ detail, images = {} }: { detail: NonNullable<Plan['
 export function PlanView({ plan, candidates, images }: { plan: Plan; candidates: Candidate[]; images?: Record<string, string> }) {
   return (
     <div className="stack lg">
+      {plan.edit_request && (
+        <p className="notice info small">
+          <strong>이 버전에 반영한 수정 요청</strong> {plan.edit_request}
+        </p>
+      )}
       <PlanConcept plan={plan} />
       <section className="stack">
         <h3>원료 후보</h3>

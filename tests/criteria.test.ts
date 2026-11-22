@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diffCriteria, initialCriteria, normalizeWeights, sanitizeProposal, validateCriteria } from '../lib/criteria';
+import { diffCriteria, initialCriteria, normalizeWeights, resolveRefs, sanitizeProposal, validateCriteria } from '../lib/criteria';
 import { climateFor } from '../lib/domain';
 
 const base = initialCriteria({ market: 'KR', launch_month: 7, product_type: 'gel_cream' });
@@ -72,5 +72,42 @@ describe('비교', () => {
     expect(d).toContainEqual({ label: '연구 근거', from: '25%', to: '40%' });
     expect(d).toHaveLength(4);
     expect(diffCriteria(base, base)).toEqual([]);
+  });
+});
+
+describe('원료 지정과 제외', () => {
+  const catalog = [
+    { id: 'panax-ginseng', name: '인삼추출물' },
+    { id: 'licorice-root', name: '감초추출물' },
+    { id: 'green-tea', name: '녹차추출물' },
+  ];
+  it('AI가 낸 ID 중 원료 DB에 있는 것만 남기고, 양쪽에 있으면 빼는 쪽을 따른다', () => {
+    const c = sanitizeProposal({ include_ids: ['panax-ginseng', 'unicorn-horn', 'green-tea'], exclude_ids: ['licorice-root', 'green-tea'] }, base, catalog);
+    expect(c.include).toEqual([{ id: 'panax-ginseng', name: '인삼추출물' }]);
+    expect(c.exclude).toEqual([catalog[1], catalog[2]]);
+    expect(validateCriteria(c).ok).toBe(true);
+  });
+  it('AI가 목록을 내지 않으면 현재 지정을 유지하고, 빈 목록을 내면 지정을 푼다', () => {
+    const pinned = { ...base, include: [catalog[0]] };
+    expect(sanitizeProposal({}, pinned, catalog).include).toEqual([catalog[0]]);
+    expect(sanitizeProposal({ include_ids: [] }, pinned, catalog)).toEqual(base);
+  });
+  it('형식이 틀리거나 같은 원료가 양쪽에 있거나 6개 이상 지정하면 검증에서 막는다', () => {
+    expect(validateCriteria({ ...base, include: ['panax-ginseng'] }).ok).toBe(false);
+    expect(validateCriteria({ ...base, include: [catalog[0]], exclude: [catalog[0]] }).ok).toBe(false);
+    const six = Array.from({ length: 6 }, (_, i) => ({ id: `x${i}`, name: 'x' }));
+    expect(validateCriteria({ ...base, include: six }).ok).toBe(false);
+  });
+  it('원료 DB에 없는 원료가 있으면 받지 않고, 이름은 DB의 값으로 바꾼다', () => {
+    expect(resolveRefs({ ...base, include: [{ id: 'unicorn-horn', name: '유니콘' }] }, catalog)).toBeNull();
+    expect(resolveRefs({ ...base, exclude: [{ id: 'green-tea', name: '아무 이름' }] }, catalog)!.exclude).toEqual([catalog[2]]);
+    expect(resolveRefs(base, catalog)).toEqual(base);
+  });
+  it('지정과 제외가 바뀌면 원료 이름으로 보여 준다', () => {
+    const d = diffCriteria(base, { ...base, include: [catalog[0]], exclude: [catalog[1]] });
+    expect(d).toEqual([
+      { label: '꼭 넣을 원료', from: '없음', to: '인삼추출물' },
+      { label: '뺄 원료', from: '없음', to: '감초추출물' },
+    ]);
   });
 });

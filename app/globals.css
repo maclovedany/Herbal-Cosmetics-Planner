@@ -156,6 +156,10 @@ input, select, textarea {
 }
 textarea { min-height: 96px; resize: vertical; }
 input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* 미리보기에서 지정·제외 원료를 빼는 칩 버튼 */
+button.chipbtn { padding: 2px 10px; border-radius: 999px; border: 0; font-size: 13px; font-weight: 400; background: var(--accent-soft); color: var(--accent); }
+button.chipbtn.warn { background: var(--warn-soft); color: var(--warn); }
+
 /* 비밀번호 입력칸 오른쪽의 보기·숨기기 눈 버튼 */
 .pwwrap { position: relative; display: block; }
 .pwwrap input { padding-right: 42px; }

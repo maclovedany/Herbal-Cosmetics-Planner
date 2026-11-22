@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { initialCriteria, sanitizeProposal, diffCriteria } from '../lib/criteria';
 import { runPlanPipeline } from '../lib/generate';
-import { FEEDBACK_SCHEMA, buildFeedbackPrompt } from '../lib/llm/feedback';
+import { FEEDBACK_SCHEMA, buildFeedbackPrompt, readInstruction } from '../lib/llm/feedback';
 import { generateJson } from '../lib/llm/gemini';
 import type { StepEvent } from '../lib/pipeline';
 import type { Ingredient } from '../lib/scoring';
@@ -31,10 +31,17 @@ describe.skipIf(!process.env.LIVE)('실제 Gemini', () => {
   }, 240_000);
 
   it('피드백을 기준 변경안으로 바꾼다', async () => {
-    const raw = await generateJson(buildFeedbackPrompt(criteria, '쿨링 진정 젤크림', '연구 근거를 훨씬 더 중요하게 봐 주세요. 자극 우려가 있는 원료는 빼 주세요.'), FEEDBACK_SCHEMA);
-    const next = sanitizeProposal(raw, criteria);
+    const catalog = (seed as unknown as Ingredient[]).map((i) => ({ id: i.id, name: i.name }));
+    const plan = { concept_name: '쿨링 진정 젤크림', concept: '여름철 달아오른 피부를 가라앉히는 젤크림', target: '20~30대', key_claims: ['진정'], ingredient_reasons: [], cautions: [] };
+    const raw = await generateJson(
+      buildFeedbackPrompt(criteria, plan, catalog, '연구 근거를 훨씬 더 중요하게 봐 주세요. 자극 우려가 있는 원료는 빼 주세요. 인삼은 꼭 넣고, 콘셉트 문장은 더 고급스럽게 써 주세요.'),
+      FEEDBACK_SCHEMA,
+    );
+    const next = sanitizeProposal(raw, criteria, catalog);
     console.log(JSON.stringify(raw), diffCriteria(criteria, next));
     expect(next.weights.research_evidence).toBeGreaterThan(25);
     expect(next.required).toContain('low_irritation');
+    expect(next.include?.map((r) => r.id)).toContain('panax-ginseng');
+    expect(readInstruction(raw)).not.toBe('');
   }, 60_000);
 });

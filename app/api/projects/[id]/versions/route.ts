@@ -2,7 +2,8 @@
 // 입력 확인까지는 일반 JSON 오류로 답하고, 그 뒤로는 단계별 진행 이벤트를 흘려보낸다.
 import { randomUUID } from 'node:crypto';
 import { CONFLICT, IMAGE_BUCKET, NOT_FOUND, fail, findLatestVersion, findProject, getSession, isUuid, readJson } from '@/lib/api';
-import { diffCriteria, validateCriteria, type Criteria } from '@/lib/criteria';
+import { diffCriteria, resolveRefs, validateCriteria, type Criteria, type IngredientRef } from '@/lib/criteria';
+import { readInstruction } from '@/lib/llm/feedback';
 import { climateFor } from '@/lib/domain';
 import { InsufficientCandidatesError, PlanVerificationError, runPlanPipeline } from '@/lib/generate';
 import { LlmError } from '@/lib/llm/gemini';
@@ -30,6 +31,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // 첫 생성은 프로젝트의 초기 기준을 쓴다. 그 뒤로는 피드백 미리보기에서 확인한 기준만 받는다.
   let criteria: Criteria;
   let feedbackId: string | null = null;
+  // 피드백 미리보기에서 저장해 둔 기획안 수정 요청. 브라우저가 보낸 값이 아니라 feedback 행에서 읽는다.
+  let instruction = '';
   if (!latest) {
     criteria = project.initial_criteria;
   } else {
@@ -40,16 +43,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (checked.criteria.season.climate !== climateFor(project.market, project.launch_month)) {
       return fail(422, 'invalid_criteria', '계절 조건은 출시 시장과 출시 월로 정해져요.');
     }
-    criteria = checked.criteria;
+    // 지정·제외 원료는 원료 DB에 있는 것만 받는다.
+    const { data: catalog } = await supabase.from('ingredients').select('id, name');
+    const resolved = resolveRefs(checked.criteria, (catalog ?? []) as IngredientRef[]);
+    if (!resolved) return fail(422, 'invalid_criteria', '원료 DB에 없는 원료는 지정하거나 뺄 수 없어요.');
+    criteria = resolved;
     const { data: feedback } = await supabase
       .from('feedback')
-      .select('id')
+      .select('id, proposed_changes')
       .eq('id', feedbackId)
       .eq('project_id', project.id)
       .eq('base_version_id', latest.id)
       .eq('status', 'proposed')
       .maybeSingle();
     if (!feedback) return fail(422, 'invalid', '이 피드백은 이미 적용했거나 취소했어요.');
+    instruction = readInstruction(feedback.proposed_changes);
   }
 
   const changes = latest ? diffCriteria(latest.criteria, criteria) : [];
@@ -70,11 +78,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       step: 'criteria',
       status: 'done',
       note: latest
-        ? `v${latest.version_no}의 기준에서 ${changes.length}개 항목을 바꿔 v${nextNo}을 만들어요.`
+        ? `v${latest.version_no}의 기준에서 ${changes.length}개 항목을 바꿔 v${nextNo}을 만들어요.${instruction ? ' 피드백의 기획안 수정 요청도 기획자에게 넘겨요.' : ''}`
         : '프로젝트의 초기 평가 기준으로 v1을 만들어요.',
       changes,
       db: latest
-        ? [{ store: 'plan_versions', op: 'read', note: `v${latest.version_no} 행의 criteria 열에서 현재 기준을 읽었어요.` }]
+        ? [
+            { store: 'plan_versions', op: 'read', note: `v${latest.version_no} 행의 criteria 열에서 현재 기준을 읽었어요.` },
+            { store: 'feedback', op: 'read', note: 'proposed_changes 열에서 기획안 수정 요청을 읽었어요.' },
+          ]
         : [{ store: 'projects', op: 'read', note: 'initial_criteria 열에서 초기 기준을 읽었어요.' }],
     });
 
@@ -87,6 +98,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         criteria,
         ingredients: ingredients as Ingredient[],
         emit,
+        edit: latest && instruction ? { previous: latest.plan, instruction } : undefined,
         images: {
           generate: generateImage,
           async store(index, bytes) {

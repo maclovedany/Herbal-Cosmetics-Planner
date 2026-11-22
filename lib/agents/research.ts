@@ -13,7 +13,11 @@ export class InsufficientCandidatesError extends Error {
 export function selectCandidates(ingredients: Ingredient[], criteria: Criteria, project: PlanProject) {
   const ranked = rankIngredients(ingredients, criteria, project);
   if (ranked.length < MIN_CANDIDATES) throw new InsufficientCandidatesError(ranked.length);
-  return { passed: ranked.length, candidates: ranked.slice(0, TOP_N) };
+  // 지정한 원료를 먼저 싣고 남는 자리를 점수순으로 채운다. 순위 숫자는 전체 순위 그대로 둔다.
+  const pinned = ranked.filter((c) => c.pinned).slice(0, TOP_N);
+  const rest = ranked.filter((c) => !c.pinned).slice(0, TOP_N - pinned.length);
+  const candidates = [...pinned, ...rest].sort((a, b) => a.rank - b.rank);
+  return { passed: ranked.length, candidates, pinned: pinned.length };
 }
 
 export const RESEARCH_SCHEMA = {

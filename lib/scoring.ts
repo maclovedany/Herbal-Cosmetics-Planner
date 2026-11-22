@@ -29,6 +29,8 @@ export type Candidate = {
   total: number;
   scores: Record<WeightKey, number>;
   sources: Source[];
+  // 기준의 '꼭 넣을 원료'로 지정돼 들어온 후보에만 true를 둔다.
+  pinned?: true;
 };
 
 export const MIN_CANDIDATES = 3;
@@ -59,13 +61,16 @@ export function scoreIngredient(
 }
 
 // 필수 조건을 통과한 원료를 총점순으로 정렬해 돌려준다. 동점이면 ID순이다.
+// 기준에서 뺀 원료는 제외하고, 꼭 넣도록 지정한 원료는 필수 조건을 통과하지 못해도 남긴다.
 export function rankIngredients(
   ingredients: Ingredient[],
   criteria: Criteria,
   brief: { market: Market; product_type: ProductType },
 ): Candidate[] {
+  const pinned = new Set((criteria.include ?? []).map((r) => r.id));
+  const excluded = new Set((criteria.exclude ?? []).map((r) => r.id));
   return ingredients
-    .filter((i) => criteria.required.every((k) => REQUIRED_CHECKS[k](i.traits, criteria)))
+    .filter((i) => !excluded.has(i.id) && (pinned.has(i.id) || criteria.required.every((k) => REQUIRED_CHECKS[k](i.traits, criteria))))
     .map((i) => {
       const scores = scoreIngredient(i.traits, criteria, brief);
       const total = round1(WEIGHT_KEYS.reduce((s, k) => s + (scores[k] * criteria.weights[k]) / 100, 0));
@@ -83,5 +88,6 @@ export function rankIngredients(
       total,
       scores,
       sources: i.sources,
+      ...(pinned.has(i.id) ? { pinned: true as const } : {}),
     }));
 }
