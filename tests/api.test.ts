@@ -32,6 +32,7 @@ vi.mock('@/lib/llm/gemini', async (original) => ({
 vi.mock('@/lib/llm/openai', () => ({ generateImage: () => state.image!() }));
 
 import { POST as createProject } from '../app/api/projects/route';
+import { DELETE as deleteProject } from '../app/api/projects/[id]/route';
 import { POST as createVersion } from '../app/api/projects/[id]/versions/route';
 import { POST as previewFeedback } from '../app/api/projects/[id]/feedback/route';
 import { LlmError } from '../lib/llm/gemini';
@@ -336,6 +337,43 @@ describe('피드백으로 기획안 고치기', () => {
     );
     expect(r.status).toBe(422);
     expect(await versionCount(id)).toBe(1);
+  });
+});
+
+describe('프로젝트 삭제', () => {
+  const del = (id: string) => call(deleteProject(new Request('http://test', { method: 'DELETE' }), ctx(id)));
+  const count = async (table: string, id: string) =>
+    (await rows<{ n: number }>(`select count(*)::int as n from ${table} where ${table === 'projects' ? 'id' : 'project_id'} = $1`, [id]))[0].n;
+
+  it('소유자가 지우면 프로젝트와 버전, 피드백, 상세이미지가 함께 지워진다', async () => {
+    const id = await newProject('지울 프로젝트');
+    const keep = await newProject('남길 프로젝트');
+    const v1 = await firstVersion(id);
+    await firstVersion(keep);
+    await call(previewFeedback(req({ base_version_id: v1.id, body: '연구 근거' }), ctx(id)));
+    const mine = [...uploadedFiles].filter((p) => p.includes(`/${id}/`));
+    expect(mine).toHaveLength(3);
+
+    expect((await del(id)).status).toBe(200);
+    expect(await count('projects', id)).toBe(0);
+    expect(await count('plan_versions', id)).toBe(0);
+    expect(await count('feedback', id)).toBe(0);
+    for (const p of mine) expect(uploadedFiles.has(p)).toBe(false);
+    // 다른 프로젝트는 그대로다.
+    expect(await count('plan_versions', keep)).toBe(1);
+    expect([...uploadedFiles].filter((p) => p.includes(`/${keep}/`))).toHaveLength(3);
+    expect((await del(id)).status).toBe(404);
+  });
+
+  it('다른 사용자는 지울 수 없고 404를 받는다', async () => {
+    const id = await newProject('남의 프로젝트');
+    await firstVersion(id);
+    login(USER_B);
+    expect((await del(id)).status).toBe(404);
+    login(null);
+    expect((await del(id)).status).toBe(401);
+    expect(await count('projects', id)).toBe(1);
+    expect(await count('plan_versions', id)).toBe(1);
   });
 });
 

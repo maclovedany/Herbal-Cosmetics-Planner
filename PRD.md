@@ -89,6 +89,7 @@ flowchart TD
 - 생성 시 프로젝트명, 출시 시장, 출시 월, 제품 유형을 받는다.
 - 서버가 브리프에서 계절 조건과 초기 평가 기준을 정해 `projects.initial_criteria`에 저장한다. 사용자는 프로젝트 상세에서 기준을 확인하고 피드백으로 바꾼다.
 - 목록에는 자기 프로젝트만 나온다.
+- 소유자는 목록의 카드에서 프로젝트를 지울 수 있다. 한 번 더 확인을 받고, 그 프로젝트의 버전·피드백·상세이미지를 함께 지운다. 되돌릴 수 없다.
 
 ### F3. 첫 기획안 생성
 - 프로젝트의 브리프와 초기 평가 기준으로 v1을 만든다.
@@ -266,7 +267,7 @@ flowchart LR
 
 ### 규칙
 
-- `plan_versions`는 넣기만 하고 고치지 않는다. 수정·삭제 정책을 만들지 않는다.
+- `plan_versions`는 넣기만 하고 고치지 않는다. 수정·삭제 정책을 만들지 않는다. 프로젝트를 지울 때만 외래 키(`on delete cascade`)로 함께 지워진다.
 - 새 버전 저장과 피드백 상태 변경은 Postgres 함수 하나로 묶어 한 트랜잭션에서 처리한다.
 - 현재 기준을 따로 저장하는 열은 두지 않는다. 항상 최신 버전의 `criteria`에서 읽는다.
 
@@ -285,8 +286,9 @@ flowchart LR
 | 메서드·경로 | 하는 일 | 주요 오류 |
 |---|---|---|
 | `POST /api/projects` | 프로젝트 생성. 브리프를 받아 초기 평가 기준과 함께 저장 | 401, 422 |
+| `DELETE /api/projects/[id]` | 프로젝트 삭제. 버전과 피드백은 외래 키로 함께 지워지고, 상세이미지 파일도 지운다 | 401, 404 |
 | `POST /api/projects/[id]/versions` | 새 버전 생성. 첫 생성 본문: `base_version_id: null` (프로젝트의 초기 기준을 쓴다). 피드백 적용 본문: `base_version_id`, `feedback_id`, `criteria` | 404, 409, 422, 502 |
-| `POST /api/projects/[id]/feedback` | 피드백 미리보기. 본문: `base_version_id`, `body` → `feedback_id`, `criteria`(변경 후 기준 전체), `summary` | 404, 409, 422, 502 |
+| `POST /api/projects/[id]/feedback` | 피드백 미리보기. 본문: `base_version_id`, `body` → `feedback_id`, `criteria`(변경 후 기준 전체), `summary`, `plan_instruction`(기획안 수정 요청) | 404, 409, 422, 502 |
 
 - 목록·상세·버전 조회는 서버 컴포넌트에서 Supabase를 직접 읽는다.
 - 소유자가 아닌 프로젝트는 403이 아니라 404로 응답한다. 프로젝트가 있는지도 알려 주지 않는다.

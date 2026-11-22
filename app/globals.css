@@ -61,6 +61,13 @@ ul, ol { margin: 0; padding-left: 20px; }
 .projects-bg .card { background: rgba(255, 252, 246, 0.88); border-color: rgba(214, 190, 140, 0.7); backdrop-filter: blur(6px); box-shadow: 0 6px 20px rgba(120, 80, 30, 0.1); }
 .projects-bg .cards { grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 20px; }
 
+/* 새 프로젝트 버튼: 분홍 그라데이션 위로 빛이 왼쪽에서 오른쪽으로 지나간다 */
+.btn.shine { position: relative; overflow: hidden; padding: 11px 22px; border: 0; border-radius: 999px; font-size: 15px; color: #fff; background: linear-gradient(100deg, #c2185b 0%, #f0466f 40%, #ff7a8a 70%, #ffb36b 100%); box-shadow: 0 6px 18px rgba(208, 48, 90, 0.4); text-shadow: 0 1px 3px rgba(110, 10, 50, 0.4); transition: transform 0.18s ease, box-shadow 0.18s ease; }
+.btn.shine::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 45%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.75), transparent); transform: translateX(-130%) skewX(-20deg); animation: btnshine 2.4s ease-in-out infinite; }
+.btn.shine:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(208, 48, 90, 0.5); }
+@keyframes btnshine { 0% { transform: translateX(-130%) skewX(-20deg); } 60%, 100% { transform: translateX(330%) skewX(-20deg); } }
+@media (prefers-reduced-motion: reduce) { .btn.shine::after { animation: none; } }
+
 /* 프로젝트 카드: 위쪽 금색 띠, 버전 배지, 아래 생성일 */
 .pcard { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 24px 22px 16px; border-radius: 16px; overflow: hidden; transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
 .pcard::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 5px; background: linear-gradient(90deg, #8f2a33, #d9a441 55%, #f3d68b); }
@@ -70,6 +77,11 @@ ul, ol { margin: 0; padding-left: 20px; }
 .pbadge.on { border-color: transparent; color: #fff; background: linear-gradient(135deg, #8f2a33, #b8862f); }
 .chip.gold { background: #f6e7c4; color: #7a5312; font-weight: 600; }
 .pfoot { margin-top: 4px; padding-top: 12px; border-top: 1px solid rgba(214, 190, 140, 0.6); }
+.plink { color: inherit; }
+.plink:hover { text-decoration: none; }
+.plink::after { content: ''; position: absolute; inset: 0; }
+button.pdel { position: relative; z-index: 1; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: transparent; color: var(--danger); border: 1px solid #e3b5b1; }
+button.pdel:hover:not(:disabled) { background: var(--danger); color: #fff; border-color: var(--danger); }
 .pgo { font-size: 13px; font-weight: 700; color: #8f2a33; transition: transform 0.18s ease; }
 .projects-bg .pcard:hover { transform: translateY(-4px); border-color: #c99a3f; box-shadow: 0 14px 32px rgba(120, 60, 30, 0.2); }
 .pcard:hover .pgo { transform: translateX(4px); }

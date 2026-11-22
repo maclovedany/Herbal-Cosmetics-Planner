@@ -11,6 +11,7 @@ app/
   projects/                  # 목록, new, [id], [id]/versions/[no]
   api/projects/              # PRD 9절의 API
     route.ts                 #   POST 프로젝트 생성
+    [id]/route.ts            #   DELETE 프로젝트 삭제 (버전·피드백·상세이미지 포함)
     [id]/versions/route.ts   #   POST 첫 생성, 피드백 적용 후 새 버전
     [id]/feedback/route.ts   #   POST 피드백 미리보기
 public/
@@ -23,7 +24,7 @@ components/
   PlanView.tsx               # 기획안의 부분별 컴포넌트와 한 버전 전체 보기
   VersionCompare.tsx         # 두 버전을 부분별로 좌우에 나란히 놓는 비교 화면
   FeedbackPanel.tsx          # 피드백 입력, 기준 변경 미리보기
-  CriteriaView.tsx, NewProjectForm.tsx, LogoutButton.tsx
+  CriteriaView.tsx, NewProjectForm.tsx, LogoutButton.tsx, DeleteProjectButton.tsx
 lib/
   domain.ts                  # 시장·제품 유형·기후·피부 고민 목록, 브리프 → 계절 조건
   criteria.ts                # 평가 기준 타입, 초기값, 검증, AI 변경안 정리, 비교

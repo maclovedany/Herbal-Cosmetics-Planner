@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { DeleteProjectButton } from '@/components/DeleteProjectButton';
 import { getSession, type ProjectRow } from '@/lib/api';
 import { MARKETS, PRODUCT_TYPES } from '@/lib/domain';
 
@@ -21,7 +22,7 @@ export default async function ProjectsPage() {
       <main className="stack lg">
         <div className="row between">
           <h1>내 프로젝트</h1>
-          <Link className="btn" href="/projects/new">
+          <Link className="btn shine" href="/projects/new">
             새 프로젝트
           </Link>
         </div>
@@ -36,23 +37,31 @@ export default async function ProjectsPage() {
           {projects.map((p) => {
             const latest = Math.max(0, ...p.plan_versions.map((v) => v.version_no));
             return (
-              <Link key={p.id} href={`/projects/${p.id}`} className="card link pcard">
+              <article key={p.id} className="card pcard">
                 <div className="row between">
                   <span className="eyebrow">
                     {MARKETS[p.market]} · {p.launch_month}월 출시
                   </span>
                   <span className={`pbadge ${latest > 0 ? 'on' : ''}`}>{latest > 0 ? `v${latest}` : '준비 중'}</span>
                 </div>
-                <h2>{p.name}</h2>
+                <h2>
+                  {/* 카드 전체가 이 링크로 눌린다. 삭제 버튼만 그 위에 올라온다. */}
+                  <Link href={`/projects/${p.id}`} className="plink">
+                    {p.name}
+                  </Link>
+                </h2>
                 <div className="row">
                   <span className="chip gold">{PRODUCT_TYPES[p.product_type].label}</span>
                   <span className="small muted">{latest > 0 ? `최신 기획안 v${latest}` : '첫 기획안을 아직 만들지 않았어요'}</span>
                 </div>
                 <div className="row between pfoot">
                   <span className="small muted">생성일 {date(p.created_at)}</span>
-                  <span className="pgo">열기 →</span>
+                  <span className="row">
+                    <DeleteProjectButton id={p.id} name={p.name} />
+                    <span className="pgo">열기 →</span>
+                  </span>
                 </div>
-              </Link>
+              </article>
             );
           })}
         </div>

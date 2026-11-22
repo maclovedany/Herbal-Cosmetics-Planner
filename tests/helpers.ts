@@ -73,6 +73,7 @@ export function fakeSupabase(db: PGlite, user: { id: string; email: string } | n
     from(table: string) {
       let cols = '*';
       let insert: Record<string, unknown> | null = null;
+      let remove = false;
       let tail = '';
       const where: string[] = [];
       const params: unknown[] = [];
@@ -85,6 +86,7 @@ export function fakeSupabase(db: PGlite, user: { id: string; email: string } | n
             values,
           );
         }
+        if (remove) return run(`delete from ${table}${where.length ? ` where ${where.join(' and ')}` : ''}`, params);
         return run(`select ${cols} from ${table}${where.length ? ` where ${where.join(' and ')}` : ''}${tail}`, params);
       };
       const builder = {
@@ -94,6 +96,10 @@ export function fakeSupabase(db: PGlite, user: { id: string; email: string } | n
         },
         insert(values: Record<string, unknown>) {
           insert = values;
+          return builder;
+        },
+        delete() {
+          remove = true;
           return builder;
         },
         eq(column: string, value: unknown) {
