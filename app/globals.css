@@ -156,6 +156,11 @@ input, select, textarea {
 }
 textarea { min-height: 96px; resize: vertical; }
 input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* 비밀번호 입력칸 오른쪽의 보기·숨기기 눈 버튼 */
+.pwwrap { position: relative; display: block; }
+.pwwrap input { padding-right: 42px; }
+button.eye { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: flex; padding: 6px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); }
+button.eye:hover, button.eye[aria-pressed='true'] { color: var(--accent); }
 label.check { flex-direction: row; align-items: center; gap: 8px; font-weight: 400; font-size: 14px; }
 label.check input { width: auto; }
 

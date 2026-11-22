@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
@@ -59,14 +60,23 @@ export default function LoginPage() {
         </label>
         <label>
           비밀번호
-          <input
-            type="password"
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            required
-            minLength={6}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <span className="pwwrap">
+            <input
+              type={show ? 'text' : 'password'}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <button type="button" className="eye" aria-label={show ? '비밀번호 숨기기' : '비밀번호 보기'} aria-pressed={show} onClick={() => setShow(!show)}>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+                <circle cx="12" cy="12" r="3" />
+                {show && <path d="M4 4l16 16" />}
+              </svg>
+            </button>
+          </span>
         </label>
         {error && <p className="notice error">{error}</p>}
         {info && <p className="notice info">{info}</p>}
