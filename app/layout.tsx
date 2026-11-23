@@ -5,7 +5,7 @@ import { LogoutButton } from '@/components/LogoutButton';
 import { getSession } from '@/lib/api';
 
 export const metadata: Metadata = {
-  title: '한방 원료 기획',
+  title: '한방 원료 화장품 기획 에이전트',
   description: '한방 유래 원료 기반 화장품 기획 도구',
 };
 
@@ -26,7 +26,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body suppressHydrationWarning>
         <header className="topbar">
           <Link href="/projects" className="brand">
-            한방 원료 기획
+            한방 원료 화장품 기획 에이전트
           </Link>
           <ul className="herbs">
             {HERBS.map((h) => (
