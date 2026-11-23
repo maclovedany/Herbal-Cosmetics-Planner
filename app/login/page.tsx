@@ -48,51 +48,54 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="narrow">
-      <form className="card stack" onSubmit={submit}>
-        <div>
-          <h1>{mode === 'login' ? '로그인' : '회원가입'}</h1>
-          <p className="muted small">한방 유래 원료로 화장품 기획안을 만들어요.</p>
-        </div>
-        <label>
-          이메일
-          <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-        </label>
-        <label>
-          비밀번호
-          <span className="pwwrap">
-            <input
-              type={show ? 'text' : 'password'}
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <button type="button" className="eye" aria-label={show ? '비밀번호 숨기기' : '비밀번호 보기'} aria-pressed={show} onClick={() => setShow(!show)}>
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
-                <circle cx="12" cy="12" r="3" />
-                {show && <path d="M4 4l16 16" />}
-              </svg>
-            </button>
-          </span>
-        </label>
-        {error && <p className="notice error">{error}</p>}
-        {info && <p className="notice info">{info}</p>}
-        <button disabled={busy}>{busy ? '확인하는 중…' : mode === 'login' ? '로그인' : '가입하기'}</button>
-        <button
-          type="button"
-          className="quiet"
-          onClick={() => {
-            setMode(mode === 'login' ? 'signup' : 'login');
-            setError('');
-            setInfo('');
-          }}
-        >
-          {mode === 'login' ? '계정이 없어요. 회원가입' : '이미 계정이 있어요. 로그인'}
-        </button>
-      </form>
-    </main>
+    <div className="projects-bg loginbg">
+      <main className="narrow">
+        <form className="card stack fcard" onSubmit={submit}>
+          <div>
+            <p className="eyebrow">韓方 · Herbal Cosmetics</p>
+            <h1>{mode === 'login' ? '로그인' : '회원가입'}</h1>
+            <p className="muted small">한방 유래 원료로 화장품 기획안을 만들어요.</p>
+          </div>
+          <label>
+            이메일
+            <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          </label>
+          <label>
+            비밀번호
+            <span className="pwwrap">
+              <input
+                type={show ? 'text' : 'password'}
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button type="button" className="eye" aria-label={show ? '비밀번호 숨기기' : '비밀번호 보기'} aria-pressed={show} onClick={() => setShow(!show)}>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+                  <circle cx="12" cy="12" r="3" />
+                  {show && <path d="M4 4l16 16" />}
+                </svg>
+              </button>
+            </span>
+          </label>
+          {error && <p className="notice error">{error}</p>}
+          {info && <p className="notice info">{info}</p>}
+          <button className="cta" disabled={busy}>{busy ? '확인하는 중…' : mode === 'login' ? '로그인' : '가입하기'}</button>
+          <button
+            type="button"
+            className="quiet"
+            onClick={() => {
+              setMode(mode === 'login' ? 'signup' : 'login');
+              setError('');
+              setInfo('');
+            }}
+          >
+            {mode === 'login' ? '계정이 없어요. 회원가입' : '이미 계정이 있어요. 로그인'}
+          </button>
+        </form>
+      </main>
+    </div>
   );
 }

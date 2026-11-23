@@ -96,6 +96,9 @@ button.pdel:hover:not(:disabled) { background: var(--danger); color: #fff; borde
 .fhint strong { color: #8f2a33; }
 button.cta { padding: 12px 16px; border: 0; border-radius: 10px; font-size: 15px; background: linear-gradient(100deg, #8f2a33, #b8862f); box-shadow: 0 6px 16px rgba(143, 42, 51, 0.25); }
 button.cta:hover:not(:disabled) { filter: brightness(1.08); }
+.loginbg { display: flex; align-items: center; }
+.loginbg main { flex: 1; min-width: 0; }
+.loginbg .eyebrow { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.14em; color: #b8862f; font-weight: 700; }
 
 /* 프로젝트 상세 배경: 위쪽에 사진이 비치고 아래로 갈수록 미색으로 잦아든다 */
 .project-bg { --surface: #fffaf1; min-height: calc(100vh - 106px); background: linear-gradient(180deg, rgba(251, 241, 228, 0.15) 0, rgba(251, 241, 228, 0.8) 200px, #fbf1e4 360px, #f9e2da 100%), url('/projects-bg.jpg') top right / 150% auto no-repeat, #fbf1e4; }
